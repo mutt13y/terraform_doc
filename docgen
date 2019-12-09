@@ -3,6 +3,7 @@
 
 import re
 import argparse
+import os
 from pprint import pprint
 
 
@@ -52,23 +53,21 @@ class TFDoc:
         self._block = self._outline
 
     def add_text(self, text):
-        self._block['text'] += text + '\n'
+        if not self._block:
+            self._unclassified_text += text + '\n'
+        else:
+            self._block['text'] += text + '\n'
 
     def end_block(self):
         self._block = None
 
     def __str__(self):
-        text = f'''# {self._outline['title']}
+        text = f'''# {self._outline['title']}\n\n{self._outline['text']}'''
 
-{self._outline['text']}
-
-## Argument Reference
-
-'''
-
+        text += '## Argument Reference\n\n'
         for (var, attribute) in self._variables.items():
             default = f'''(optional, default: {attribute['default']})''' if attribute['default'] else '(Required)'
-            text += f'''- ```{var}``` - {default} [{attribute['type']}] {attribute['text']}\n\n'''
+            text += f'''- ```{var}``` - {default} [{attribute['type']}] {attribute['description']} {attribute['text']}\n\n'''
 
         for (section, attributes) in self._sections.items():
             text += f'''## {section}\n\n{attributes['text']}\n'''
@@ -80,6 +79,7 @@ class TFDoc:
         for (section, attributes) in self._footers.items():
             text += f'''## {section}\n\n{attributes['text']}\n'''
 
+        text += self._unclassified_text
 
         return text
 
@@ -94,6 +94,8 @@ args = parser.parse_args()
 docs = TFDoc()
 
 for file in args.source:
+    if os.path.isdir(file):
+        continue
     if args.verbose: print(f'>>> {file}')
     with open(file) as f:
         for line in f.readlines():
@@ -114,11 +116,11 @@ for file in args.source:
 
                 if words[0] == 'variable':
                     name = re.search('"(.*)"', words[1])
-                    docs.variable(name.group(0))
+                    docs.variable(name.group(1))
 
                 if words[0] == 'description':
-                    name = re.search('"(.*)"', words[1])
-                    docs.description(name.group(0))
+                    description = re.search('"(.*)"', words[1])
+                    docs.description(description.group(1))
 
                 # TODO Handle multiline types
                 if words[0] == 'type':
@@ -129,9 +131,15 @@ for file in args.source:
 
                 if words[0] == 'output':
                     name = re.search('"(.*)"', words[1])
-                    docs.output(name.group(0))
+                    docs.output(name.group(1))
 
                 if words[0] == '#==':
                     docs.end_block()
 
-print(docs)
+if args.out:
+    file = open(args.out[0],'w+')
+    print(docs, file=file)
+    file.close()
+
+else:
+    print(docs)

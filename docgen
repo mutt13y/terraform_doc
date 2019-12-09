@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Generate markdown from terraform module."""
+
+import re
+import argparse
+from pprint import pprint
+
+
+class TFDoc:
+    """stateful class to parse terraform docstrings."""
+
+    def __init__(self):
+        self._variables = {}
+        self._outputs = {}
+        self._sections = {}
+        self._outline = {'title': "", 'text': ""}
+        self._footers = {}
+
+        self._block = None
+        self._unclassified_text = ""
+
+    def variable(self, name):
+        self._variables[name] = {'description': "", 'type': "", 'default': None, 'text': ""}
+        self._block = self._variables[name]
+
+    def description(self, description):
+        self._block['description'] = description
+
+    def type(self, type):
+        if '{' in type:
+            self._block['type'] = 'complex'
+        else:
+            self._block['type'] = type
+
+    def default(self, default):
+        self._block['default'] = default
+
+    def output(self, name):
+        self._outputs[name] = {'text': ""}
+        self._block = self._outputs[name]
+
+    def section(self, name):
+        self._sections[name] = {'text': ""}
+        self._block = self._sections[name]
+
+    def footer(self, name):
+        self._footers[name] = {'text': ""}
+        self._block = self._footers[name]
+
+    def outline(self, title):
+        self._outline['title'] = title
+        self._block = self._outline
+
+    def add_text(self, text):
+        self._block['text'] += text + '\n'
+
+    def end_block(self):
+        self._block = None
+
+    def __str__(self):
+        text = f'''# {self._outline['title']}
+
+{self._outline['text']}
+
+## Argument Reference
+
+'''
+
+        for (var, attribute) in self._variables.items():
+            default = f'''(optional, default: {attribute['default']})''' if attribute['default'] else '(Required)'
+            text += f'''- ```{var}``` - {default} [{attribute['type']}] {attribute['text']}\n\n'''
+
+        for (section, attributes) in self._sections.items():
+            text += f'''## {section}\n\n{attributes['text']}\n'''
+
+        text += '## Attributes Reference\n\n'
+        for (var, attributes) in self._outputs.items():
+            text += f'''- ```{var}``` {attributes['text']}\n'''
+
+        for (section, attributes) in self._footers.items():
+            text += f'''## {section}\n\n{attributes['text']}\n'''
+
+
+        return text
+
+
+parser = argparse.ArgumentParser(description='Generate terraform docs', prog='PROG', usage='%(prog)s [options]')
+parser.add_argument('source', nargs='+')
+parser.add_argument('--out', nargs=1)
+parser.add_argument('--verbose', '-v', action='store_true')
+
+args = parser.parse_args()
+
+docs = TFDoc()
+
+for file in args.source:
+    if args.verbose: print(f'>>> {file}')
+    with open(file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if words := line.split(None,1):
+
+                if words[0] == '#=':
+                    docs.add_text(words[1] if len(words) > 1 else "\n")
+
+                if words[0] == '#=OUTLINE=':
+                    docs.outline(words[1])
+
+                if words[0] == '#=SECTION=':
+                    docs.section(words[1])
+
+                if words[0] == '#=FOOTER=':
+                    docs.footer(words[1])
+
+                if words[0] == 'variable':
+                    name = re.search('"(.*)"', words[1])
+                    docs.variable(name.group(0))
+
+                if words[0] == 'description':
+                    name = re.search('"(.*)"', words[1])
+                    docs.description(name.group(0))
+
+                # TODO Handle multiline types
+                if words[0] == 'type':
+                    docs.type(words[1].split('=')[1].strip())
+
+                if words[0] == 'default':
+                    docs.default(words[1])
+
+                if words[0] == 'output':
+                    name = re.search('"(.*)"', words[1])
+                    docs.output(name.group(0))
+
+                if words[0] == '#==':
+                    docs.end_block()
+
+print(docs)

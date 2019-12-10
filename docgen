@@ -65,19 +65,21 @@ class TFDoc:
         text = f'''# {self._outline['title']}\n\n{self._outline['text']}'''
 
         text += '## Argument Reference\n\n'
-        for (var, attribute) in self._variables.items():
+        for var in sorted(self._variables.keys()):
+            attribute = self._variables[var]
             default = f'''(optional, default: {attribute['default']})''' if attribute['default'] else '(Required)'
             text += f'''- ```{var}``` - {default} [{attribute['type']}] {attribute['description']} {attribute['text']}\n\n'''
 
-        for (section, attributes) in self._sections.items():
-            text += f'''## {section}\n\n{attributes['text']}\n'''
+        for (section, attribute) in self._sections.items():
+            text += f'''## {section}\n\n{attribute['text']}\n'''
 
         text += '## Attributes Reference\n\n'
-        for (var, attributes) in self._outputs.items():
-            text += f'''- ```{var}``` {attributes['text']}\n'''
+        for var in sorted(self._outputs.keys()):
+            attribute=self._outputs[var]
+            text += f'''- ```{var}``` {attribute['text']}\n'''
 
-        for (section, attributes) in self._footers.items():
-            text += f'''## {section}\n\n{attributes['text']}\n'''
+        for (section, attribute) in self._footers.items():
+            text += f'''## {section}\n\n{attribute['text']}\n'''
 
         text += self._unclassified_text
 

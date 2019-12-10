@@ -57,3 +57,16 @@ output "urls" {
 
 #= ### Unclassified text
 #= stuff not in a block
+
+output "not_in_order" {
+  value = 1
+}
+
+/*=
+#=SECTION= Multiline MD
+- test markdown
+- within
+- multiline comment
+
+``` bit of code ```
+*/

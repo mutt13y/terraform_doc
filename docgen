@@ -99,6 +99,7 @@ for file in args.source:
     if os.path.isdir(file):
         continue
     if args.verbose: print(f'>>> {file}')
+    multiline_comment = False
     with open(file) as f:
         for line in f.readlines():
             line = line.strip()
@@ -109,12 +110,31 @@ for file in args.source:
 
                 if words[0] == '#=OUTLINE=':
                     docs.outline(words[1])
+                    continue
 
                 if words[0] == '#=SECTION=':
                     docs.section(words[1])
+                    continue
 
                 if words[0] == '#=FOOTER=':
                     docs.footer(words[1])
+                    continue
+
+                if words[0] == '#==':
+                    docs.end_block()
+                    continue
+
+                if words[0] == '/*=':
+                    multiline_comment = True
+                    continue
+
+                if multiline_comment and  '*/' in line:
+                    multiline_comment = False
+                    continue
+                
+                if multiline_comment:
+                    docs.add_text(line)
+                    continue
 
                 if words[0] == 'variable':
                     name = re.search('"(.*)"', words[1])
@@ -135,8 +155,10 @@ for file in args.source:
                     name = re.search('"(.*)"', words[1])
                     docs.output(name.group(1))
 
-                if words[0] == '#==':
-                    docs.end_block()
+            elif multiline_comment:
+                docs.add_text(line)
+
+
 
 if args.out:
     file = open(args.out[0],'w+')

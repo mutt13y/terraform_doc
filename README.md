@@ -59,3 +59,17 @@ Footer blocks are added after the attributes
 ### Unclassified text
 
 any other lines starting ```#=``` outside of a block are added after all the footers
+
+## Multiline doc strings
+
+start line with ```/*=``` rest of line is ignored all lines upto but not including a line containing ```*/``` are added acording to the same rules as above. You can include section directives within the multiline comments
+
+```
+/*=
+#=OUTLINE= title
+this text
+is all included 
+in the markdown
+
+but not this */
+```

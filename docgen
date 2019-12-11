@@ -11,6 +11,7 @@ class TFDoc:
     """stateful class to parse terraform docstrings."""
 
     def __init__(self):
+        """Set private vars to default."""
         self._variables = {}
         self._outputs = {}
         self._sections = {}
@@ -21,47 +22,84 @@ class TFDoc:
         self._unclassified_text = ""
 
     def variable(self, name):
+        """
+        Add a variable or Argument pass the variable name.
+
+        This starts a variable block so calls to description, type, default, or add text will be
+        associated with this variable.
+        """
         self._variables[name] = {'description': "", 'type': "", 'default': None, 'text': ""}
         self._block = self._variables[name]
 
     def description(self, description):
+        """Add description text to the active variable."""
         self._block['description'] = description
 
     def type(self, type):
+        """Set the variable type."""
         if '{' in type:
             self._block['type'] = 'complex'
         else:
             self._block['type'] = type
 
     def default(self, default):
+        """Define the default valur for the current variable."""
         self._block['default'] = default
 
     def output(self, name):
+        """
+        Add output or Attribute.
+
+        this starts an output block so calls to add_txt are associated with this Attribute.
+        """
         self._outputs[name] = {'text': ""}
         self._block = self._outputs[name]
 
     def section(self, name):
+        """
+        Start an additional section with headding name.
+
+        These sections appear between the Argument and attribute sections.
+        """
         self._sections[name] = {'text': ""}
         self._block = self._sections[name]
 
     def footer(self, name):
+        """
+        Start a footer block.
+
+        Footer blocks appear after the Attribute block.
+        """
         self._footers[name] = {'text': ""}
         self._block = self._footers[name]
 
     def outline(self, title):
+        """
+        Start the outline block.
+
+        The outline block appears first in the docs.
+        The title provided will be the title of the whole document.
+        """
         self._outline['title'] = title
         self._block = self._outline
 
     def add_text(self, text):
+        """Add text tothe current block or the unclissified block if no block is active."""
         if not self._block:
             self._unclassified_text += text + '\n'
         else:
             self._block['text'] += text + '\n'
 
     def end_block(self):
+        """
+        End the current block.
+
+        This is not strictly necessary but it prevents stray text being added to this block
+        """
         self._block = None
 
     def __str__(self):
+        """Output the masterpiece."""
         text = f'''# {self._outline['title']}\n\n{self._outline['text']}'''
 
         text += '## Argument Reference\n\n'
@@ -105,6 +143,7 @@ for file in args.source:
             line = line.strip()
             if words := line.split(None,1):
 
+                # Doc Directives
                 if words[0] == '#=':
                     docs.add_text(words[1] if len(words) > 1 else "\n")
 
@@ -124,18 +163,21 @@ for file in args.source:
                     docs.end_block()
                     continue
 
-                if words[0] == '/*=':
+                if words[0] == '/*=' and '*/' not in line:
                     multiline_comment = True
                     continue
 
-                if multiline_comment and  '*/' in line:
+                if multiline_comment and '*/' in line:
                     multiline_comment = False
                     continue
-                
+
                 if multiline_comment:
                     docs.add_text(line)
                     continue
 
+                # Language components
+                # The following words might incidentally exist in multiline comments
+                # So must go last
                 if words[0] == 'variable':
                     name = re.search('"(.*)"', words[1])
                     docs.variable(name.group(1))
@@ -161,7 +203,7 @@ for file in args.source:
 
 
 if args.out:
-    file = open(args.out[0],'w+')
+    file = open(args.out[0], 'w+')
     print(docs, file=file)
     file.close()
 

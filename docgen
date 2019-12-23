@@ -110,11 +110,11 @@ class TFDoc:
 
         for (section, attribute) in self._sections.items():
             text += f'''## {section}\n\n{attribute['text']}\n'''
-
-        text += '## Attributes Reference\n\n'
-        for var in sorted(self._outputs.keys()):
-            attribute=self._outputs[var]
-            text += f'''- ```{var}``` {attribute['text']}\n'''
+        if len(self._outputs) > 0:
+            text += '## Attributes Reference\n\n'
+            for var in sorted(self._outputs.keys()):
+                attribute=self._outputs[var]
+                text += f'''- ```{var}``` {attribute['text']}\n'''
 
         for (section, attribute) in self._footers.items():
             text += f'''## {section}\n\n{attribute['text']}\n'''

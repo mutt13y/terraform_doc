@@ -139,8 +139,8 @@ for file in args.source:
     if args.verbose: print(f'>>> {file}')
     multiline_comment = False
     with open(file) as f:
-        for line in f.readlines():
-            line = line.strip()
+        for raw_line in f.readlines():
+            line = raw_line.strip()
             if words := line.split(None,1):
 
                 # Doc Directives
@@ -198,7 +198,7 @@ for file in args.source:
                     docs.output(name.group(1))
 
             elif multiline_comment:
-                docs.add_text(line)
+                docs.add_text(raw_line)
 
 
 

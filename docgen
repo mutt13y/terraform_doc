@@ -172,7 +172,7 @@ for file in args.source:
                     continue
 
                 if multiline_comment:
-                    docs.add_text(line)
+                    docs.add_text(raw_line)
                     continue
 
                 # Language components

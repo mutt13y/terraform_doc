@@ -26,6 +26,18 @@ terraform variable or output statement automatically start a block.
 
 within a variable or output definition the text is added to the Argument or attribute definition
 
+### Variable object or list(object)
+Create a table Trailing `#=` to include a per line description
+
+```
+variable "x" {
+  type = list(object({
+    A = string        #= the string for A
+    B = number        #= B is a number
+  }
+}
+```
+
 ### Outline
 
 Outline section defines the page main title and first block of text. The attributes follow

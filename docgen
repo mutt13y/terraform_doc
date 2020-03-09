@@ -24,8 +24,8 @@ class TFDoc:
 
         self._multiline_comment = False
         self._in_var = False
+        self._in_type = False
         self.debug = False
-
 
     def set_indent(self, indent):
         """
@@ -40,7 +40,7 @@ class TFDoc:
         This starts a variable block so calls to description, type, default, or add text will be
         associated with this variable.
         """
-        self._variables[name] = {'description': "", 'type': "", 'default': None, 'text': ""}
+        self._variables[name] = {'description': "", 'type': "", 'default': None, 'text': "", 'object': {} }
         self._block = self._variables[name]
         self._indent = 2
 
@@ -51,9 +51,14 @@ class TFDoc:
     def type(self, type):
         """Set the variable type."""
         if '{' in type:
-            self._block['type'] = 'complex'
+            self._block['type'] = type[:-2] + ')'
+            self._in_type = True
         else:
             self._block['type'] = type
+
+    def object(self, key, _type, description=''):
+        """Add object definition for complex types"""
+        self._block['object'][key] = {'type': _type, 'description': description}
 
     def default(self, default):
         """Define the default value for the current variable."""
@@ -120,7 +125,17 @@ class TFDoc:
         for var in sorted(self._variables.keys()):
             attribute = self._variables[var]
             default = f'''(optional, default: {attribute['default']})''' if attribute['default'] else '(Required)'
-            text += f'''- ```{var}``` - {default} [{attribute['type']}] {attribute['description']} {attribute['text']}\n\n'''
+            _object = attribute['object']
+            text += f'''- ```{var}``` - {default} [{attribute['type']}] {attribute['description']} '''
+            if _object:
+                text += '\n##### object'
+                text += '''
+| key | type | description |
+|-----|------|-------------|
+'''
+                for key, definition in _object.items():
+                    text += f'''|`{key}` | {definition['type']} | {definition['description']} |\n'''
+            text += f'''{attribute['text']}\n\n'''
 
         for (section, attribute) in self._sections.items():
             text += f'''## {section}\n\n{attribute['text']}\n'''
@@ -154,6 +169,15 @@ class TFDoc:
         """
         line = raw_line.strip()
         not self.debug or print(line)
+
+        if self._in_type:
+            if '}' in line:
+                self._in_type = False
+                return
+            key, rest = line.split('=', 1)
+            (_type, description) = rest.split('#=') if '#=' in rest else (rest,'')
+            self.object(key.strip(), _type.strip(), description.strip())
+            return
 
         if words := line.split(None, 1):
 

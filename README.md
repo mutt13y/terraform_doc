@@ -4,7 +4,7 @@ Reads variable and output definitions. Then builds documentation in mark down.
 
 ## usage
 
-```docgen <filelist> [--out=output file] [--verbose]```
+```docgen <filelist> [--out=output file] [--verbose] [--debug]```
 
 ## Inline docs
 
@@ -13,17 +13,18 @@ Lines start with ```#=```
 
 ```#= some text``` "some text" is added to the current block or the final block if no block is active
 
-```#==``` - end of block
+```#==``` or ```}``` - end of block
 
 ```#=DIRECTIVE= argument``` start of block
 
 ```#=``` on its own adds a blank line to the current block
 
+```#=INDENT= N``` set constant indent to N. NB Indent is automatically set to 2 in a variable block.
 ### variables and outputs
 
 terraform variable or output statement automatically start a block.
 
-within or just after a variable or output definition the text is added to the Argument or attribute definition
+within a variable or output definition the text is added to the Argument or attribute definition
 
 ### Outline
 

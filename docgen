@@ -20,6 +20,18 @@ class TFDoc:
 
         self._block = None
         self._unclassified_text = ""
+        self._indent = ""
+
+        self._multiline_comment = False
+        self._in_var = False
+        self.debug = False
+
+
+    def set_indent(self, indent):
+        """
+        Set current default indent for text to 'indent'
+        """
+        self._indent = indent
 
     def variable(self, name):
         """
@@ -30,6 +42,7 @@ class TFDoc:
         """
         self._variables[name] = {'description': "", 'type': "", 'default': None, 'text': ""}
         self._block = self._variables[name]
+        self._indent = 2
 
     def description(self, description):
         """Add description text to the active variable."""
@@ -43,7 +56,7 @@ class TFDoc:
             self._block['type'] = type
 
     def default(self, default):
-        """Define the default valur for the current variable."""
+        """Define the default value for the current variable."""
         self._block['default'] = default
 
     def output(self, name):
@@ -88,15 +101,16 @@ class TFDoc:
         if not self._block:
             self._unclassified_text += text + '\n'
         else:
-            self._block['text'] += text + '\n'
+            self._block['text'] += " " * self._indent + text + '\n'
 
     def end_block(self):
         """
         End the current block.
 
-        This is not strictly necessary but it prevents stray text being added to this block
+        prevents stray text being added to this block and resets indent.
         """
         self._block = None
+        self._indent = 0
 
     def __str__(self):
         """Output the masterpiece."""
@@ -119,87 +133,111 @@ class TFDoc:
         for (section, attribute) in self._footers.items():
             text += f'''## {section}\n\n{attribute['text']}\n'''
 
-        text += self._unclassified_text
+        text += self._unclassified_text + '\n'
 
         return text
+
+    def __add__(self, other):
+        if type(other) == str:
+            self.process_line(other)
+            return self
+        elif type(other) == list:
+            for line in other:
+                self.process_line(line)
+            return self
+        else:
+            return NotImplemented
+
+    def process_line(self, raw_line):
+        """
+        Process a single line from a terraform file
+        """
+        line = raw_line.strip()
+        not self.debug or print(line)
+
+        if words := line.split(None, 1):
+
+            if words[0] == '#=':
+                self.add_text(line[3:] if len(words) > 1 else "\n")
+                return
+
+            if words[0] == '#=OUTLINE=':
+                self.outline(words[1])
+                return
+
+            if words[0] == '#=SECTION=':
+                self.section(words[1])
+                return
+
+            if words[0] == '#=FOOTER=':
+                self.footer(words[1])
+                return
+
+            if words[0] == "#=INDENT=":
+                self.set_indent(int(words[1]))
+
+            if words[0] == '#==' or words[0] == "}":
+                self.end_block()
+                self._in_var = False
+                return
+
+            if words[0] == '/*=' and '*/' not in line:
+                self._multiline_comment = True
+                return
+
+            if self._multiline_comment and '*/' in line:
+                self._multiline_comment = False
+                return
+
+            if self._multiline_comment:
+                self.add_text(raw_line)
+                return
+
+            # Language components
+            # The following words might incidentally exist in multiline comments
+            # So must go last
+            if words[0] == 'variable':
+                name = re.search('"(.*)"', words[1])
+                self.variable(name.group(1))
+                self._in_var = True
+
+            if words[0] == 'description' and self._in_var:
+                description = re.search('"(.*)"', words[1])
+                self.description(description.group(1))
+
+            # TODO Handle multiline types
+            if words[0] == 'type' and self._in_var:
+                self.type(words[1].split('=')[1].strip())
+
+            if words[0] == 'default' and self._in_var:
+                self.default(words[1])
+
+            if words[0] == 'output':
+                name = re.search('"(.*)"', words[1])
+                self.output(name.group(1))
+                in_var = True
+
+        elif self._multiline_comment:
+            self.add_text(raw_line)
 
 
 parser = argparse.ArgumentParser(description='Generate terraform docs', prog='PROG', usage='%(prog)s [options]')
 parser.add_argument('source', nargs='+')
 parser.add_argument('--out', nargs=1)
 parser.add_argument('--verbose', '-v', action='store_true')
+parser.add_argument('--debug', '-d', action='store_true')
 
 args = parser.parse_args()
 
 docs = TFDoc()
+docs.debug = args.debug
 
 for file in args.source:
     if os.path.isdir(file):
         continue
     if args.verbose: print(f'>>> {file}')
-    multiline_comment = False
     with open(file) as f:
-        for raw_line in f.readlines():
-            line = raw_line.strip()
-            if words := line.split(None,1):
-
-                # Doc Directives
-                if words[0] == '#=':
-                    docs.add_text(words[1] if len(words) > 1 else "\n")
-
-                if words[0] == '#=OUTLINE=':
-                    docs.outline(words[1])
-                    continue
-
-                if words[0] == '#=SECTION=':
-                    docs.section(words[1])
-                    continue
-
-                if words[0] == '#=FOOTER=':
-                    docs.footer(words[1])
-                    continue
-
-                if words[0] == '#==':
-                    docs.end_block()
-                    continue
-
-                if words[0] == '/*=' and '*/' not in line:
-                    multiline_comment = True
-                    continue
-
-                if multiline_comment and '*/' in line:
-                    multiline_comment = False
-                    continue
-
-                if multiline_comment:
-                    docs.add_text(raw_line)
-                    continue
-
-                # Language components
-                # The following words might incidentally exist in multiline comments
-                # So must go last
-                if words[0] == 'variable':
-                    name = re.search('"(.*)"', words[1])
-                    docs.variable(name.group(1))
-
-                if words[0] == 'description':
-                    description = re.search('"(.*)"', words[1])
-                    docs.description(description.group(1))
-
-                # TODO Handle multiline types
-                if words[0] == 'type':
-                    docs.type(words[1].split('=')[1].strip())
-
-                if words[0] == 'default':
-                    docs.default(words[1])
-
-                if words[0] == 'output':
-                    name = re.search('"(.*)"', words[1])
-                    docs.output(name.group(1))
-
-            elif multiline_comment:
-                docs.add_text(raw_line)
-
+        docs += f.readlines()
 
 
 if args.out:
